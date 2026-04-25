@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ШКОЛТЕХ - Чат</title>
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { background: #f1f5f9; margin: 0; font-family: Arial, sans-serif; }
+        .topbar {
+            background: #081B7D;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .topbar a { color: white; text-decoration: none; font-weight: bold; font-size: 18px; }
+        .container {
+            max-width: 800px;
+            margin: 15px auto;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .tabs {
+            display: flex;
+            background: #e2e8f0;
+        }
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            border-bottom: 3px solid transparent;
+            transition: 0.2s;
+        }
+        .tab:hover { background: #cbd5e1; }
+        .tab.active {
+            background: white;
+            border-bottom: 3px solid #081B7D;
+            color: #081B7D;
+        }
+        .chat-area {
+            display: none;
+            flex-direction: column;
+            height: 450px;
+        }
+        .chat-area.active { display: flex; }
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .msg {
+            max-width: 70%;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 14px;
+            word-break: break-word;
+        }
+        .msg.mine {
+            align-self: flex-end;
+            background: #081B7D;
+            color: white;
+        }
+        .msg.other {
+            align-self: flex-start;
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .msg .sender {
+            font-size: 10px;
+            font-weight: bold;
+            margin-bottom: 2px;
+            opacity: 0.8;
+        }
+        .msg .time {
+            font-size: 9px;
+            text-align: right;
+            opacity: 0.7;
+            margin-top: 3px;
+        }
+        .input-row {
+            display: flex;
+            padding: 10px;
+            gap: 8px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .input-row input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        .input-row input:focus { outline: none; border-color: #081B7D; }
+        .input-row button {
+            background: #081B7D;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .empty { text-align: center; color: #94a3b8; padding: 40px; font-size: 14px; }
+        .user-select {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .user-select select {
+            flex: 1;
+            padding: 8px;
+            border: 2px solid #e2e8f0;
+            border-radius: 5px;
+        }
+        .back-link {
+            text-align: center;
+            margin-top: 10px;
+        }
+        .back-link a { color: #081B7D; font-weight: bold; text-decoration: none; }
+
+        @media (max-width: 500px) {
+            .container { margin: 5px; }
+            .chat-area { height: 400px; }
+            .msg { max-width: 85%; font-size: 13px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <a href="{{ url_for('home') }}">ШКОЛТЕХ</a>
+        <a href="{{ url_for('account') }}">{{ user.first_name }} {{ user.last_name }}</a>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('general')">ОБЩИЙ ЧАТ</div>
+            <div class="tab" onclick="switchTab('private')">ЛИЧНЫЕ СООБЩЕНИЯ</div>
+        </div>
+
+        <!-- Общий чат -->
+        <div id="generalTab" class="chat-area active">
+            <div class="messages" id="generalMessages"><div class="empty">Загрузка...</div></div>
+            <div class="input-row">
+                <input type="text" id="generalInput" placeholder="Сообщение в общий чат..." maxlength="500">
+                <button onclick="sendGeneral()">ОТПРАВИТЬ</button>
+            </div>
+        </div>
+
+        <!-- Личные сообщения -->
+        <div id="privateTab" class="chat-area">
+            <div class="user-select">
+                <span style="font-size:13px;">Кому:</span>
+                <select id="privateUser"></select>
+            </div>
+            <div class="messages" id="privateMessages"><div class="empty">Выберите получателя</div></div>
+            <div class="input-row">
+                <input type="text" id="privateInput" placeholder="Личное сообщение..." maxlength="500">
+                <button onclick="sendPrivate()">ОТПРАВИТЬ</button>
+            </div>
+        </div>
+    </div>
+    <div class="back-link"><a href="{{ url_for('home') }}">← НА ГЛАВНУЮ</a></div>
+
+    <script>
+        const uid = {{ user.id }};
+        const uname = "{{ user.username }}";
+        let allMessages = [];
+        let usersList = [];
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.chat-area').forEach(c => c.classList.remove('active'));
+
+            if (tab === 'general') {
+                document.querySelector('.tab:first-child').classList.add('active');
+                document.getElementById('generalTab').classList.add('active');
+            } else {
+                document.querySelector('.tab:last-child').classList.add('active');
+                document.getElementById('privateTab').classList.add('active');
+                loadPrivateMessages();
+            }
+        }
+
+        function loadUsers() {
+            fetch('/chat/users')
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    usersList = d.users.filter(u => u.id != uid);
+                    const sel = document.getElementById('privateUser');
+                    sel.innerHTML = '<option value="0">Выберите пользователя</option>' +
+                        usersList.map(u => `<option value="${u.id}">${u.username} (${u.role_display})</option>`).join('');
+                    sel.onchange = function() { loadPrivateMessages(); };
+                }
+            });
+        }
+
+        function loadAllMessages() {
+            fetch('/chat/messages')
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    allMessages = d.messages;
+                    loadGeneralMessages();
+                    loadPrivateMessages();
+                }
+            });
+        }
+
+        function loadGeneralMessages() {
+            const c = document.getElementById('generalMessages');
+            const msgs = allMessages.filter(m => !m.to_user_id || m.to_user_id === 0);
+            
+            if (msgs.length === 0) {
+                c.innerHTML = '<div class="empty">Нет сообщений</div>';
+                return;
+            }
+            c.innerHTML = msgs.map(m => renderMessage(m)).join('');
+            c.scrollTop = c.scrollHeight;
+        }
+
+        function loadPrivateMessages() {
+            const c = document.getElementById('privateMessages');
+            const toId = parseInt(document.getElementById('privateUser').value);
+
+            if (!toId) {
+                c.innerHTML = '<div class="empty">Выберите получателя</div>';
+                return;
+            }
+
+            const msgs = allMessages.filter(m =>
+                (m.user_id == uid && m.to_user_id == toId) ||
+                (m.user_id == toId && m.to_user_id == uid)
+            );
+
+            if (msgs.length === 0) {
+                c.innerHTML = '<div class="empty">Нет личных сообщений</div>';
+                return;
+            }
+            c.innerHTML = msgs.map(m => renderMessage(m)).join('');
+            c.scrollTop = c.scrollHeight;
+        }
+
+        function renderMessage(m) {
+            const isMine = m.user_id == uid;
+            return `<div class="msg ${isMine ? 'mine' : 'other'}">
+                ${!isMine ? '<div class="sender">' + m.username + '</div>' : ''}
+                <div>${m.message}</div>
+                <div class="time">${m.created_at || ''}</div>
+            </div>`;
+        }
+
+        function sendGeneral() {
+            const inp = document.getElementById('generalInput');
+            const msg = inp.value.trim();
+            if (!msg) return;
+
+            const fd = new FormData();
+            fd.append('message', msg);
+
+            fetch('/chat/send', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    inp.value = '';
+                    loadAllMessages();
+                }
+            });
+        }
+
+        function sendPrivate() {
+            const inp = document.getElementById('privateInput');
+            const msg = inp.value.trim();
+            const toId = document.getElementById('privateUser').value;
+            if (!msg || !toId || toId === '0') return;
+
+            const fd = new FormData();
+            fd.append('message', msg);
+            fd.append('to_user_id', toId);
+
+            fetch('/chat/send', { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) {
+                    inp.value = '';
+                    loadAllMessages();
+                }
+            });
+        }
+
+        document.getElementById('generalInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); sendGeneral(); }
+        });
+        document.getElementById('privateInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); sendPrivate(); }
+        });
+
+        loadUsers();
+        loadAllMessages();
+        setInterval(loadAllMessages, 2000);
+    </script>
+</body>
+</html>

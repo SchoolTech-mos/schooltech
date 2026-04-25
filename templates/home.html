@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ШКОЛТЕХ - Главная</title>
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background-image: url("{{ url_for('static', filename='images/background.png') }}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+            font-family: 'UNCAGE', sans-serif;
+        }
+        .content {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .welcome-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .welcome-text {
+            flex: 1;
+        }
+        .name-line {
+            font-size: clamp(32px, 6vw, 90px);
+            font-weight: bold;
+            color: #1e293b;
+            line-height: 1.1;
+            margin-bottom: 5px;
+        }
+        .welcome-message {
+            font-size: clamp(24px, 4vw, 70px);
+            font-weight: bold;
+            color: #081B7D;
+            line-height: 1.1;
+            margin-top: 30px;
+        }
+        .image-section {
+            flex: 0 0 auto;
+            max-width: 45%;
+        }
+        .welcome-image {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+        }
+        .buttons-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .image-button {
+            position: relative;
+            aspect-ratio: 16/10;
+            border-radius: 20px;
+            overflow: hidden;
+            cursor: pointer;
+            text-decoration: none;
+            display: block;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+        }
+        .image-button:hover {
+            transform: translateY(-5px);
+        }
+        .button-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 20px;
+        }
+        .button-text {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            color: white;
+            padding: clamp(10px, 2vw, 20px);
+            font-size: clamp(18px, 2.5vw, 32px);
+            font-weight: bold;
+            text-align: center;
+            border-radius: 0 0 20px 20px;
+        }
+        .flash-message {
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            font-family: 'MONTSERRAT', sans-serif;
+        }
+        .flash-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        @media (max-width: 768px) {
+            .welcome-section {
+                flex-direction: column;
+                text-align: center;
+            }
+            .image-section {
+                max-width: 70%;
+                margin: 0 auto;
+            }
+            .buttons-section {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 15px;
+            }
+        }
+        @media (max-width: 480px) {
+            .buttons-section {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo-section">
+            <a href="{{ url_for('home') }}" class="logo-link">
+                <div class="logo-text">ШКОЛТЕХ</div>
+            </a>
+            <div class="location">МОСКВА</div>
+        </div>
+        
+        <div class="user-section">
+            {% if user and user.role == 'teacher' %}
+            <a href="{{ url_for('admin_panel') }}" class="admin-nav-btn" style="margin-right: 15px;">
+                АДМИН
+            </a>
+            {% endif %}
+            
+            <div class="notification-icon" id="notificationIcon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                {% if unread_count and unread_count > 0 %}
+                <div class="notification-badge">{{ unread_count }}</div>
+                {% endif %}
+            </div>
+            
+            <a href="{{ url_for('account') }}" class="user-profile-link">
+                <div class="user-profile">
+                    <div class="avatar">{{ user.avatar }}</div>
+                    <div class="user-info">
+                        <div class="username">{{ user.first_name }} {% if user.middle_name %}{{ user.middle_name }}{% endif %}</div>
+                        <div class="user-role {{ user.role }}">{{ user.role_display }}</div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </nav>
+
+    <div id="notificationsPanel" class="notifications-panel">
+        <div class="notifications-header">
+            <h3>УВЕДОМЛЕНИЯ</h3>
+            <button onclick="markAllAsRead()">ПРОЧИТАТЬ ВСЕ</button>
+        </div>
+        <div class="notifications-list">
+            <div class="notification-item">Загрузка...</div>
+        </div>
+    </div>
+
+    <div class="content">
+        {% if error %}
+            <div class="flash-message error">{{ error }}</div>
+        {% endif %}
+
+        {% if user %}
+        <div class="welcome-section">
+            <div class="welcome-text">
+                <div class="name-line">{{ user.first_name }}</div>
+                {% if user.middle_name %}<div class="name-line">{{ user.middle_name }},</div>{% endif %}
+                <div class="welcome-message">ДОБРО ПОЖАЛОВАТЬ!</div>
+            </div>
+            
+            <div class="image-section">
+                <img src="{{ url_for('static', filename='images/school.png') }}" class="welcome-image" alt="Школа">
+            </div>
+        </div>
+
+        <div class="buttons-section">
+            <a href="{{ url_for('rentals') }}" class="image-button">
+                <img src="{{ url_for('static', filename='images/rentals.jpg') }}" class="button-image" alt="Выдачи">
+                <div class="button-text">ВЫДАЧИ</div>
+            </a>
+            <a href="{{ url_for('school_page') }}" class="image-button">
+                <img src="{{ url_for('static', filename='images/school2.jpg') }}" class="button-image" alt="Школа">
+                <div class="button-text">ШКОЛА</div>
+            </a>
+            <a href="{{ url_for('account') }}" class="image-button">
+                <img src="{{ url_for('static', filename='images/account.jpg') }}" class="button-image" alt="Аккаунт">
+                <div class="button-text">АККАУНТ</div>
+            </a>
+            <a href="{{ url_for('chat') }}" class="image-button">
+                <img src="{{ url_for('static', filename='images/chat.jpg') }}" class="button-image" alt="Чат">
+                <div class="button-text">ЧАТ</div>
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
